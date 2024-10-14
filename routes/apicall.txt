@@ -1,0 +1,292 @@
+Create a Category (POST)
+
+URL: http://localhost:5000/api/categories/post
+Method: POST
+Body (JSON):
+json
+Copy code
+{
+  "name": "Electronics",
+  "description": "All kinds of electronic items"
+}
+
+
+
+2) Read Categories (GET)
+
+URL: http://localhost:5000/api/categories
+Method: GET
+Body: None (GET request).
+
+
+
+3)Update a Category (PUT)
+
+URL: http://localhost:5000/api/categories/(id :key)in db
+Method: PUT
+Body (JSON):
+json
+Copy code
+{
+  "name": "Home Electronics",
+  "description": "Electronics for home use"
+}
+
+4) Delete a Category (DELETE)
+
+URL: http://localhost:5000/api/categories/(id :key)in db
+Method: DELETE
+Body: None.
+Replace :id with the actual category ID you want to delete.
+
+
+
+
+const express = require('express');
+const router = express.Router();
+const mongoose= require('mongoose')
+const Subcategory = require('../models/Subcategory');
+const Category = require('../models/Category')
+
+
+// Create a new subcategory
+router.post('/', async (req, res) => {
+    try {
+        console.log('req.body',req.body);
+        const subcategory = new Subcategory(req.body);
+        await subcategory.save();
+        res.status(201).json(subcategory);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Get all subcategories
+router.get('/', async (req, res) => {
+    try {
+        const subcategories = await Subcategory.find({});
+        res.json(subcategories);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Update a subcategory
+router.put('/:id', async (req, res) => {
+    try {
+        const subcategory = await Subcategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json(subcategory);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Delete a subcategory
+router.delete('/:id', async (req, res) => {
+    try {
+        await Subcategory.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Subcategory deleted' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+module.exports = router;
+
+
+
+
+
+
+////product .js 
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import './pp.css'
+
+function Product() {
+    const [products, setProducts] = useState([]);
+    const [name, setName] = useState('');
+    const [catId, setCatId] = useState('');
+    const [subCatId, setSubCatId] = useState('');
+    const [image, setImage] = useState(null); // Handle image file
+    const [editId, setEditId] = useState(null); // For update
+    const [categories, setCategories] = useState([]);
+    const [subcategories, setSubcategories] = useState([]);
+    const [timestamp, setTimestamp] = useState('');
+
+    useEffect(() => {
+      fetchProducts();
+      fetchCategories();
+  }, []); // Remove fetchSubcategories from here
+  
+
+    // Fetch products
+    const fetchProducts = async () => {
+      try {
+          const response = await axios.get('http://localhost:5000/api/products');
+          setProducts(response.data);
+      } catch (error) {
+          console.error('Error fetching products:', error);
+      }
+  };
+
+    // Fetch categories
+    const fetchCategories = async () => {
+        try {
+            const response = await axios.get('http://localhost:5000/api/categories');
+            setCategories(response.data.data);
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+        }
+    };
+
+    // Fetch subcategories based on selected category
+  //   const fetchSubcategories = async (categoryId) => {
+  //     try {
+  //         const response = await axios.get(`http://localhost:5000/api/subcategories`);
+  //         // console.log("Subcategories:", response.data);
+  //         setSubcategories(response.data);
+  //     } catch (error) {
+  //         console.error('Error fetching subcategories:', error);
+  //     }
+  // };
+  const fetchSubcategories = async (categoryId) => {
+    console.log('Fetching subcategories for categoryId:', categoryId); // Debugging info
+    if (!categoryId) {
+        console.error('No categoryId provided');
+        return;
+    }
+    
+    try {
+        const response = await axios.get(`http://localhost:5000/api/subcategories/`);
+        console.log("Subcategories:", response.data);
+        setSubcategories(response.data);
+    } catch (error) {
+        console.error('Error fetching subcategories:', error);
+    }
+};
+
+  
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        const productData = new FormData(); // To handle image upload
+        productData.append('name', name);
+        productData.append('catId', catId);
+        productData.append('subCatId', subCatId);
+        productData.append('image', image); // Append image file
+        productData.append('timestamp', new Date().toISOString());
+
+        try {
+            if (editId) {
+                // Update
+                await axios.put(`http://localhost:5000/api/products/${editId}`, productData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            } else {
+                // Create
+                await axios.post('http://localhost:5000/api/products', productData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
+            setName('');
+            setCatId('');
+            setSubCatId('');
+            setImage(null);
+            setTimestamp('');
+            setEditId(null);
+            fetchProducts();
+        } catch (error) {
+            console.error('Error saving product:', error);
+        }
+    };
+
+    const handleEdit = (product) => {
+        setEditId(product._id);
+        setName(product.name);
+        setCatId(product.catId?._id || product.catId);
+        setSubCatId(product.subCatId?._id || product.subCatId);
+        setTimestamp(product.timestamp);
+    };
+
+    const handleDelete = async (id) => {
+        try {
+            await axios.delete(`http://localhost:5000/api/products/${id}`);
+            fetchProducts();
+        } catch (error) {
+            console.error('Error deleting product:', error);
+        }
+    };
+
+    return (
+        <div>
+            <h2>Product Management</h2>
+            <form onSubmit={handleSubmit}>
+                <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Product Name"
+                    required
+                />
+                <select
+                    value={catId}
+                    onChange={(e) => {
+                        setCatId(e.target.value);
+                        fetchSubcategories(e.target.value);
+                    }}
+                    required
+                >
+                    <option value="">Select Category</option>
+                    {categories.map((category) => (
+                        <option key={category._id} value={category._id}>
+                            {category.name}
+                        </option>
+                    ))}
+                </select>
+
+
+                <select
+                      value={subCatId}
+                      onChange={(e) => setSubCatId(e.target.value)}
+                      required
+                  >
+                      <option value="">Select Subcategory</option>
+                      {subcategories.length > 0 ? (
+                          subcategories.map((subcategory) => (
+                              <option key={subcategory._id} value={subcategory._id}>
+                                  {subcategory.name}
+                              </option>
+                          ))
+                      ) : (
+                          <option value="">No Subcategories Available</option> // Display message if no subcategories
+                      )}
+                  </select>
+                <input
+                    type="file"
+                    onChange={(e) => setImage(e.target.files[0])}
+                />
+
+                <button type="submit">
+                    {editId ? 'Update Product' : 'Create Product'}
+                </button>
+            </form>
+
+            <ul>
+                {products.map((product) => (
+                    <li key={product._id}>
+                        <span>
+                            {product.name} - Category: {product.catId?.name || 'No Category'}, 
+                            Subcategory: {product.subCatId?.name || 'No Subcategory'}
+                        </span>
+                        <button onClick={() => handleEdit(product)}>Edit</button>
+                        <button onClick={() => handleDelete(product._id)}>Delete</button>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+export default Product;
